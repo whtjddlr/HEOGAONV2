@@ -12,7 +12,7 @@ INTAKE -> NEEDS_INFO -> DIAGNOSIS -> DOCUMENTS -> INQUIRY
 - Frontend renders only the `view.type` returned by the API.
 - Backend owns case state, step routing, question loop limits, document ordering, and inquiry routing.
 - AI is optional and only handles structured extraction, summaries, and inquiry wording.
-- GraphRAG/data expansion is isolated behind catalog/services so JSON seed files or DB tables can replace current constants later.
+- GraphRAG is the primary domain expansion boundary for question candidates, documents, inquiry departments, and evidence. Catalog constants are the demo fallback.
 
 ## Structure
 
@@ -24,6 +24,7 @@ app/
   repositories/case_repository.py in-memory case store, DB-replaceable
   data/catalog.py                MVP question/document rule seeds
   services/
+    graph_rag_service.py         GraphRAG retrieve boundary and response normalizer
     flow_service.py              state-machine orchestration
     intake_agent.py              natural language -> slots
     question_planner.py          backend-owned question loop
@@ -50,6 +51,21 @@ export LLM_BASE_URL="https://api.openai.com/v1"
 `backend/.env` is loaded automatically when the server starts.
 
 If no API key is present, the service continues with deterministic rule fallback for demos.
+
+## GraphRAG Setup
+
+Copy `.env.example` to `.env`, then enable GraphRAG:
+
+```bash
+ENABLE_GRAPH_RAG=true
+GRAPH_RAG_BASE_URL="http://127.0.0.1:8200"
+GRAPH_RAG_API_KEY=""
+GRAPH_RAG_TIMEOUT_SECONDS=8
+```
+
+The backend calls `POST {GRAPH_RAG_BASE_URL}/retrieve` with `kind` set to `questions`, `documents`, `inquiries`, or `evidence`.
+
+If GraphRAG is disabled, unreachable, or returns an invalid shape, the affected area falls back to `app/data/catalog.py`. The state machine, retry limits, and next-screen routing stay in FastAPI.
 
 ## Run
 

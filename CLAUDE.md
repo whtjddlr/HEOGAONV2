@@ -26,6 +26,7 @@ cd .. && python -m compileall backend/app
 - 프론트는 화면만 그립니다.
 - 백엔드는 흐름을 통제합니다.
 - AI는 판단/질문/요약을 보조하지만, 백엔드가 검증합니다.
+- GraphRAG는 서류/부서/근거/질문 후보만 확장하고, 흐름 제어는 백엔드에 둡니다.
 - 사용자가 보는 화면에 내부 용어를 노출하지 않습니다.
 - MVP에 반려/보완 루프를 다시 넣지 않습니다.
 
@@ -39,6 +40,7 @@ cd .. && python -m compileall backend/app
 - 질문 루프: `backend/app/services/question_planner.py`
 - 프론트 view schema: `backend/app/services/view_builder.py`
 - AI 연결: `backend/app/integrations/llm_client.py`
+- GraphRAG 연결: `backend/app/services/graph_rag_service.py`
 
 ## 디자인 주의
 
@@ -52,6 +54,7 @@ cd .. && python -m compileall backend/app
 - 새 흐름은 `actionId` 또는 `machineState` 전환으로 명시합니다.
 - 프론트가 다음 단계를 추론하게 만들지 않습니다.
 - 모든 서류와 열린 문의가 끝나기 전에는 `SUBMITTED`로 보내지 않습니다.
+- GraphRAG는 `POST /retrieve` 계약만 맞추고, 실패 시 catalog fallback이 유지되어야 합니다.
 
 ## 문서 업데이트 기준
 
@@ -62,3 +65,4 @@ cd .. && python -m compileall backend/app
 - 상태 머신 변경
 - 디자인/문구 기준 변경
 - AI 입출력 계약 변경
+- GraphRAG 입출력 계약 변경

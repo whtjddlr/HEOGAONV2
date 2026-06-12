@@ -7,6 +7,7 @@ Claude Code, Codex, 다른 코딩 에이전트가 이 저장소를 수정할 때
 - 프론트가 흐름을 판단하지 않습니다.
 - 백엔드가 현재 단계와 다음 화면을 결정합니다.
 - AI 응답은 항상 백엔드에서 검증하고 프론트 schema로 변환합니다.
+- GraphRAG 응답도 백엔드에서 검증하고 프론트 schema로 정규화합니다.
 - 서류, 문의, 질문 반복 제한은 백엔드 책임입니다.
 - MVP에서 반려/보완 루프는 제외되어 있습니다.
 
@@ -50,7 +51,7 @@ Claude Code, Codex, 다른 코딩 에이전트가 이 저장소를 수정할 때
 - 서류/부서/근거 확장
 - 문의 답변 요약과 resolved/missing/task 판단
 
-현재 MVP는 API 키 없이도 동작하도록 규칙 기반 fallback을 둡니다.
+현재 MVP는 API 키 없이도 동작하도록 규칙 기반 fallback을 둡니다. GraphRAG는 `backend/app/services/graph_rag_service.py`에 붙이고, 상태 전환이나 질문 반복 제어를 GraphRAG 쪽에 넣지 않습니다.
 
 ## 주요 파일
 
@@ -68,6 +69,7 @@ backend/app/services/view_builder.py            프론트 view schema 생성
 backend/app/services/document_service.py        서류 생성/완료 처리
 backend/app/services/inquiry_service.py         문의 task/문안
 backend/app/services/consultation_analyzer.py   문의 답변 분석
+backend/app/services/graph_rag_service.py       GraphRAG /retrieve 경계
 backend/app/integrations/llm_client.py          AI API 경계
 backend/app/data/catalog.py                     MVP 데이터/질문/서류 seed
 ```
@@ -144,6 +146,14 @@ cd .. && python -m compileall backend/app
 - AI 응답은 `backend/app/schemas/ai.py` schema를 통과해야 합니다.
 - AI가 확정 표현을 내도 프론트에는 후보/확인 필요 형태로 내려야 합니다.
 - 법률 자문처럼 보이는 확정 문구는 `output_guard.py`에서 완화합니다.
+
+## GraphRAG 연결 시 주의
+
+- `.env`에 `ENABLE_GRAPH_RAG=true`, `GRAPH_RAG_BASE_URL`, `GRAPH_RAG_API_KEY`를 넣습니다.
+- GraphRAG 서버는 `POST /retrieve`를 제공해야 합니다.
+- `kind`는 `questions`, `documents`, `inquiries`, `evidence` 중 하나입니다.
+- 상세 schema는 [docs/graph-rag-integration.md](./docs/graph-rag-integration.md)를 따릅니다.
+- GraphRAG가 같은 field를 반복해도 `QuestionPlanner`가 차단해야 합니다.
 
 ## 커밋 전 체크
 

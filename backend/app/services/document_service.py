@@ -3,11 +3,20 @@ from __future__ import annotations
 from typing import Any
 
 from app.data.catalog import DOCUMENT_PRIORITY_RULES
+from app.services.graph_rag_service import GraphRagService, graph_rag_service
 from app.services.slot_utils import as_list, slot_value
 
 
 class DocumentService:
+    def __init__(self, graph_rag: GraphRagService = graph_rag_service) -> None:
+        self.graph_rag = graph_rag
+
     def build_documents(self, case: dict[str, Any]) -> list[dict[str, Any]]:
+        graph_rag_documents = self.graph_rag.build_documents(case)
+        if graph_rag_documents:
+            return graph_rag_documents
+
+        case.setdefault("ai", {})["documentsSource"] = "catalog"
         selected = [
             self.document_from_rule("building-ledger", "needs_check"),
             self.document_from_rule("health-check", "not_started"),

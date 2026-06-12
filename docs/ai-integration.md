@@ -16,6 +16,8 @@ LLM_MODEL=gpt-4o-mini
 LLM_TIMEOUT_SECONDS=12
 ENABLE_LLM=true
 ENABLE_DEMO_FALLBACK=true
+ENABLE_GRAPH_RAG=false
+GRAPH_RAG_BASE_URL=
 ```
 
 `OPENAI_API_KEY`도 fallback으로 인식합니다.
@@ -72,11 +74,13 @@ backend/app/services/output_guard.py
 
 ## GraphRAG 확장 위치
 
-현재 MVP 데이터는 `backend/app/data/catalog.py`에 있습니다. 추후 GraphRAG나 DB를 붙일 때도 `view_builder.py`나 프론트 컴포넌트가 아니라 서비스 레이어 뒤에서 교체해야 합니다.
+GraphRAG는 `backend/app/services/graph_rag_service.py` 뒤에 연결합니다. `ENABLE_GRAPH_RAG=true`와 `GRAPH_RAG_BASE_URL`을 설정하면 질문 후보, 서류, 문의 task를 GraphRAG에서 먼저 받아오고, 실패하면 `backend/app/data/catalog.py` fallback을 사용합니다.
 
-추천 교체 지점:
+연결 지점:
 
 - 서류 후보: `DocumentService`
 - 부서/연락처: `InquiryService`
-- 근거 문장: 새 `EvidenceService`
+- 근거 문장: `GraphRagService.retrieve_evidence`
 - 질문 후보: `QuestionPlanner`
+
+상세 schema는 [GraphRAG Integration](./graph-rag-integration.md)을 기준으로 맞춥니다.

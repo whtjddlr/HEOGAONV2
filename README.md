@@ -7,7 +7,7 @@
 - 프론트는 백엔드가 내려준 `view.type`과 schema만 렌더링합니다.
 - 백엔드는 case 상태, 질문 루프, 화면 전환, 무한루프 방지, 서류/문의 진행 상태를 통제합니다.
 - AI는 판단과 문안 생성을 맡는 경계로 분리되어 있으며, API 키가 없으면 규칙 기반 fallback으로 시연 가능합니다.
-- GraphRAG/문서 DB는 현재 `catalog.py` 상수로 대체되어 있고, 서비스 레이어 뒤에서 교체할 수 있게 설계했습니다.
+- GraphRAG는 서류, 부서, 근거, 질문 후보를 확장하는 메인 도메인 경계입니다. URL이 없거나 실패하면 `catalog.py` fallback으로 시연됩니다.
 
 ## 프로젝트 구조
 
@@ -44,6 +44,17 @@ cd frontend
 npm run dev -- --hostname 127.0.0.1 --port 3100
 ```
 
+GraphRAG 연결:
+
+```bash
+cd backend
+cp .env.example .env
+
+ENABLE_GRAPH_RAG=true
+GRAPH_RAG_BASE_URL=http://127.0.0.1:8200
+GRAPH_RAG_API_KEY=
+```
+
 ## 검증
 
 ```bash
@@ -59,6 +70,7 @@ cd .. && python -m compileall backend/app
 - [docs/flow-contract.md](./docs/flow-contract.md): 상태 머신과 화면 흐름 계약
 - [docs/api-contract.md](./docs/api-contract.md): 프론트-백엔드 API schema
 - [docs/ai-integration.md](./docs/ai-integration.md): AI API만 연결하면 동작하도록 둔 경계
+- [docs/graph-rag-integration.md](./docs/graph-rag-integration.md): GraphRAG `/retrieve` 연결 계약
 - [docs/demo-script.md](./docs/demo-script.md): 시연 흐름
 
 ## MVP 상태 머신

@@ -3,15 +3,26 @@ from __future__ import annotations
 from typing import Any
 
 from app.integrations.llm_client import LlmClient, llm_client
+from app.services.graph_rag_service import GraphRagService, graph_rag_service
 from app.services.output_guard import clean_text
 from app.services.slot_utils import as_list, slot_value
 
 
 class InquiryService:
-    def __init__(self, llm: LlmClient = llm_client) -> None:
+    def __init__(
+        self,
+        llm: LlmClient = llm_client,
+        graph_rag: GraphRagService = graph_rag_service,
+    ) -> None:
         self.llm = llm
+        self.graph_rag = graph_rag
 
     def build_inquiry_tasks(self, case: dict[str, Any]) -> list[dict[str, Any]]:
+        graph_rag_tasks = self.graph_rag.build_inquiry_tasks(case)
+        if graph_rag_tasks:
+            return graph_rag_tasks
+
+        case.setdefault("ai", {})["inquirySource"] = "catalog"
         tasks = [
             {
                 "id": "food-business-type",

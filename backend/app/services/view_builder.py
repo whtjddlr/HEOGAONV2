@@ -40,7 +40,7 @@ class ViewBuilder:
             },
             "meta": {
                 "schemaVersion": FLOW_SCHEMA_VERSION,
-                "source": "rules+ai-boundary",
+                "source": "rules+ai+graph-rag-boundary",
                 "fallback": case["ai"].get("intakeSource") != "llm",
                 "warnings": case["ai"].get("warnings", []),
             },

@@ -5,8 +5,9 @@ from copy import deepcopy
 from typing import Any
 from uuid import uuid4
 
-from app.data.catalog import FIELD_VALUE_MAP, MAX_TOTAL_QUESTIONS, QUESTION_BANK
+from app.data.catalog import FIELD_VALUE_MAP, MAX_TOTAL_QUESTIONS, QUESTION_BANK, unknown_option
 from app.services.document_service import DocumentService, document_service
+from app.services.graph_rag_service import GraphRagService, graph_rag_service
 from app.services.inquiry_service import InquiryService, inquiry_service
 from app.services.slot_utils import (
     admin_term_for,
@@ -23,13 +24,24 @@ class QuestionPlanner:
         self,
         documents: DocumentService = document_service,
         inquiries: InquiryService = inquiry_service,
+        graph_rag: GraphRagService = graph_rag_service,
     ) -> None:
         self.documents = documents
         self.inquiries = inquiries
+        self.graph_rag = graph_rag
 
     def build_question_plan(self, case: dict[str, Any]) -> list[dict[str, Any]]:
+        graph_rag_questions = self.graph_rag.build_question_plan(case)
+        if graph_rag_questions:
+            return self.filter_question_plan(case, graph_rag_questions)
+
+        case.setdefault("ai", {})["questionSource"] = "catalog"
+        return self.filter_question_plan(case, QUESTION_BANK)
+
+    @staticmethod
+    def filter_question_plan(case: dict[str, Any], questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         pending = []
-        for question in QUESTION_BANK:
+        for question in questions:
             field = question["field"]
             if field == "exact_address" and slot_value(case, "exact_address"):
                 continue
@@ -37,7 +49,12 @@ class QuestionPlanner:
                 continue
             if field in case["slots"]:
                 continue
-            pending.append(deepcopy(question))
+            normalized = deepcopy(question)
+            if normalized.get("inputMode") in {"single_select", "multi_select"}:
+                options = normalized.setdefault("options", [])
+                if not any(option.get("id") == "unknown" for option in options):
+                    options.append(unknown_option())
+            pending.append(normalized)
         return pending[:MAX_TOTAL_QUESTIONS]
 
     def start_or_finish_question_loop(self, case: dict[str, Any]) -> dict[str, Any]:
