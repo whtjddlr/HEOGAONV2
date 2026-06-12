@@ -1,0 +1,63 @@
+# Heogaon Flow V2 Backend
+
+FastAPI backend for the planning-document flow:
+
+```text
+INTAKE -> NEEDS_INFO -> DIAGNOSIS -> DOCUMENTS -> INQUIRY
+-> ANSWER_REVIEW -> DASHBOARD -> SUBMITTED
+```
+
+## Responsibilities
+
+- Frontend renders only the `view.type` returned by the API.
+- Backend owns case state, step routing, question loop limits, document ordering, and inquiry routing.
+- AI is optional and only handles structured extraction, summaries, and inquiry wording.
+- GraphRAG/data expansion is isolated behind catalog/services so JSON seed files or DB tables can replace current constants later.
+
+## Structure
+
+```text
+app/
+  core/config.py                 environment settings
+  integrations/llm_client.py     OpenAI-compatible JSON LLM boundary
+  schemas/ai.py                  validated AI output contracts
+  repositories/case_repository.py in-memory case store, DB-replaceable
+  data/catalog.py                MVP question/document rule seeds
+  services/
+    flow_service.py              state-machine orchestration
+    intake_agent.py              natural language -> slots
+    question_planner.py          backend-owned question loop
+    document_service.py          checklist generation/completion
+    inquiry_service.py           inquiry tasks and online drafts
+    consultation_analyzer.py     answer review and follow-up routing
+    view_builder.py              backend result -> frontend envelope
+    output_guard.py              no definitive/legal wording, PII masking
+  flow.py                        thin compatibility facade for existing routes
+```
+
+## AI Setup
+
+Copy `.env.example` to `.env` or export the variables before running:
+
+```bash
+export LLM_API_KEY="..."
+export LLM_MODEL="gpt-4o-mini"
+export LLM_BASE_URL="https://api.openai.com/v1"
+```
+
+`OPENAI_API_KEY` is also accepted as a fallback for `LLM_API_KEY`.
+
+If no API key is present, the service continues with deterministic rule fallback for demos.
+
+## Run
+
+```bash
+cd backend
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 4100
+```
+
+## Verify
+
+```bash
+python3 -m py_compile $(find app -type f -name '*.py' | sort)
+```
