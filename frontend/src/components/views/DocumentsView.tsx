@@ -72,7 +72,7 @@ export function DocumentsView({
                         </span>
                         <span className="document-prep-link">자세히 <Icon name="arrowRight" size={14} /></span>
                       </span>
-                      <span className="document-prep-text">예상 소요 {document.perceivedDuration} · {document.reason}</span>
+                      <span className="document-prep-text">예상 소요 {document.perceivedDuration}</span>
                     </button>
                   </li>
                 );
