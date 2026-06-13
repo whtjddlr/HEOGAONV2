@@ -7,6 +7,36 @@ from app.services.graph_rag_service import GraphRagService, graph_rag_service
 from app.services.output_guard import clean_text
 from app.services.slot_utils import as_list, slot_value
 
+SEOUL_DISTRICTS = [
+    "종로구",
+    "중구",
+    "용산구",
+    "성동구",
+    "광진구",
+    "동대문구",
+    "중랑구",
+    "성북구",
+    "강북구",
+    "도봉구",
+    "노원구",
+    "은평구",
+    "서대문구",
+    "마포구",
+    "양천구",
+    "강서구",
+    "구로구",
+    "금천구",
+    "영등포구",
+    "동작구",
+    "관악구",
+    "서초구",
+    "강남구",
+    "송파구",
+    "강동구",
+]
+
+MAPO_AREA_HINTS = {"홍대", "합정", "연남", "연남동", "망원", "망원동"}
+
 
 class InquiryService:
     def __init__(
@@ -23,14 +53,15 @@ class InquiryService:
             return graph_rag_tasks
 
         case.setdefault("ai", {})["inquirySource"] = "catalog"
+        district = self.district_for_case(case)
         tasks = [
             {
                 "id": "food-business-type",
                 "title": "영업신고 유형 확인",
-                "department": "마포구 보건소 위생과",
+                "department": f"{district} 보건소 위생과",
                 "phone": "tel:0231539180",
                 "onlineUrl": "https://www.epeople.go.kr/index.jsp",
-                "visitHint": "마포구 보건소 또는 구청 위생 민원 창구",
+                "visitHint": f"{district} 보건소 또는 구청 위생 민원 창구",
                 "reason": "우리 가게에 맞는 신고 유형을 확인해야 해요.",
                 "status": "pending",
                 "questions": [
@@ -45,10 +76,10 @@ class InquiryService:
             tasks.append({
                 "id": "signage-check",
                 "title": "간판 신고 확인",
-                "department": "옥외광고물 담당",
+                "department": f"{district} 옥외광고물 담당",
                 "phone": "tel:120",
                 "onlineUrl": "https://www.epeople.go.kr/index.jsp",
-                "visitHint": "구청 도시경관 또는 옥외광고물 담당 창구",
+                "visitHint": f"{district} 구청 도시경관 또는 옥외광고물 담당 창구",
                 "reason": "간판 위치와 크기 기준을 확인해야 해요.",
                 "status": "pending",
                 "questions": [
@@ -60,10 +91,10 @@ class InquiryService:
             tasks.append({
                 "id": "road-occupation-check",
                 "title": "외부 공간 사용 확인",
-                "department": "도로관리과",
+                "department": f"{district} 도로관리과",
                 "phone": "tel:120",
                 "onlineUrl": "https://www.epeople.go.kr/index.jsp",
-                "visitHint": "구청 도로점용 담당 창구",
+                "visitHint": f"{district} 구청 도로점용 담당 창구",
                 "reason": "가게 앞 공간 사용 가능 여부를 확인해야 해요.",
                 "status": "pending",
                 "questions": [
@@ -72,6 +103,23 @@ class InquiryService:
                 ],
             })
         return tasks
+
+    @staticmethod
+    def district_for_case(case: dict[str, Any]) -> str:
+        text = " ".join(
+            str(value or "")
+            for value in [
+                slot_value(case, "location"),
+                slot_value(case, "exact_address"),
+                case.get("rawInput", ""),
+            ]
+        )
+        for district in SEOUL_DISTRICTS:
+            if district in text:
+                return district
+        if any(hint in text for hint in MAPO_AREA_HINTS):
+            return "마포구"
+        return "마포구"
 
     def online_draft(self, case: dict[str, Any], task: dict[str, Any] | None) -> dict[str, str]:
         if not task:

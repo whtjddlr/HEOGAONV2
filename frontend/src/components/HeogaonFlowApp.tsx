@@ -10,7 +10,7 @@ import { FlowView } from "@/components/views/FlowView";
 import { LandingScreen } from "@/components/views/LandingScreen";
 import { getCase, sendTurn, startCase } from "@/lib/api";
 import { primaryActionState, progressFor } from "@/lib/viewState";
-import type { ApiEnvelope, DocumentItem, FlowActionId, TurnInput } from "@/types/flow";
+import type { ApiEnvelope, DocumentItem, FlowActionId, TurnInput, VisitLocation } from "@/types/flow";
 
 const MIN_ANALYSIS_LOADING_MS = 950;
 const CASE_STORAGE_KEY = "heogaon:v2:caseId";
@@ -23,6 +23,7 @@ export function HeogaonFlowApp() {
   const [freeText, setFreeText] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [consultationText, setConsultationText] = useState("");
+  const [visitLocation, setVisitLocation] = useState<VisitLocation | null>(null);
   const [activeDocument, setActiveDocument] = useState<DocumentItem | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -118,6 +119,7 @@ export function HeogaonFlowApp() {
       resetTransientInputs();
       if (input.type === "consultation_answer") {
         setConsultationText("");
+        setVisitLocation(null);
       }
     });
   }
@@ -135,6 +137,7 @@ export function HeogaonFlowApp() {
     setSelectedIds([]);
     setFreeText("");
     setConsultationText("");
+    setVisitLocation(null);
     setActiveDocument(null);
     setHistoryOpen(false);
     setResetConfirmOpen(false);
@@ -198,12 +201,14 @@ export function HeogaonFlowApp() {
                 selectedIds={selectedIds}
                 freeText={freeText}
                 consultationText={consultationText}
+                visitLocation={visitLocation}
                 activeDocument={activeDocument}
                 completedDocumentIds={envelope?.statePatch.completedDocumentIds || []}
                 onSelectIds={setSelectedIds}
                 onFreeText={setFreeText}
                 onUnknown={submitUnknown}
                 onConsultationText={setConsultationText}
+                onVisitLocation={setVisitLocation}
                 onChannel={(channel) => handleTurn({ type: "inquiry_channel", channel })}
                 onToggleDocument={(documentId, completed) => handleTurn({ type: "document_toggle", documentId, completed })}
                 onOpenDocument={setActiveDocument}

@@ -2,20 +2,31 @@
 
 import { useState } from "react";
 import { Icon, channelIcon, channelTitle } from "@/components/common/Icon";
-import type { InquiryView as InquiryViewModel } from "@/types/flow";
+import { KakaoVisitMap } from "@/components/common/KakaoVisitMap";
+import { SEOUL_OFFICE_LOCATIONS, findSeoulOfficeLocation, kakaoDirectionUrl } from "@/data/seoulOfficeLocations";
+import type { InquiryView as InquiryViewModel, VisitLocation } from "@/types/flow";
 
 export function InquiryView({
   view,
   value,
   onChange,
   onChannel,
+  visitLocation,
+  onVisitLocation,
 }: {
   view: InquiryViewModel;
   value: string;
   onChange: (value: string) => void;
   onChannel: (channel: "phone" | "online" | "visit") => void;
+  visitLocation: VisitLocation | null;
+  onVisitLocation: (location: VisitLocation) => void;
 }) {
   const task = view.task;
+  const visitSearchText = task ? `${task.department} ${task.visitHint} ${task.title} ${task.reason}` : "";
+  const officeLocation =
+    findSeoulOfficeLocation(visitSearchText) ||
+    SEOUL_OFFICE_LOCATIONS.find((location) => location.districtName === "마포구") ||
+    null;
   const [copyStatus, setCopyStatus] = useState("");
 
   async function copyOnlineDraft() {
@@ -107,6 +118,18 @@ export function InquiryView({
               <h2 className="summary-review-title">방문할 곳</h2>
             </div>
             <p className="summary-review-subtitle">{task.visitHint}</p>
+            {officeLocation ? (
+              <p className="visit-map-office">
+                {officeLocation.officeName} · {officeLocation.officeAddress}
+              </p>
+            ) : null}
+            <KakaoVisitMap
+              keyword={task.visitHint || task.department || "마포구 보건소"}
+              defaultLocation={officeLocation}
+              directionUrl={officeLocation ? kakaoDirectionUrl(officeLocation) : undefined}
+              selectedLocation={visitLocation}
+              onSelect={onVisitLocation}
+            />
           </section>
         ) : null}
         <section className="summary-review">

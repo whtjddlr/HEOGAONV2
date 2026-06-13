@@ -148,6 +148,12 @@ export interface InquiryTask {
   questions: string[];
 }
 
+export interface VisitLocation {
+  lat: number;
+  lng: number;
+  address?: string;
+}
+
 export interface AnswerReviewView {
   type: "answer_review";
   title: string;
