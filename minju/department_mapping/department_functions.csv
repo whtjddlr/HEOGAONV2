@@ -1,0 +1,8 @@
+﻿graph_function_key,graph_department_function,graph_node_id,description
+food_hygiene,식품위생 업무,n_a36f9ff91c64b1d8,"식품관련영업신고, 식품접객업 인허가, 기존 업소 행정처분 이력 확인"
+building_register_use,건축물대장 및 건축물 용도 업무,n_28eca3d424998495,"건축물대장 열람, 용도 적합성, 위반건축물 여부 확인"
+fire_safety,소방 안전 업무,n_995db848116b2fe2,"안전시설등 완비증명서, 다중이용업소 소방 관련 확인"
+outdoor_ad,옥외광고물 관리 업무,n_fb0b1245f944d5b3,"간판, 옥외광고물 표시허가 또는 신고"
+road_occupation,도로점용 업무,n_646a25d45cbbf2e3,"도로, 보도, 외부 공간 점용허가"
+tax_registration,세무 업무,n_18fc6a8ae92569d0,사업자등록 신청. 실제 접수는 구청이 아니라 관할 세무서 또는 홈택스
+ecommerce_local_economy,통신판매 및 지역경제 업무,n_c66d9970dbbf3fca,"통신판매업신고, 지역경제/일자리경제 계열 업무"

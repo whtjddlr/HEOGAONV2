@@ -1,0 +1,11 @@
+﻿local_task_key,graph_function_key,local_task_label,search_keywords
+food_business_report,food_hygiene,식품관련영업신고 및 영업신고증,"식품접객업 영업신고, 식품관련영업신고, 일반음식점, 휴게음식점"
+food_admin_disposition_history,food_hygiene,기존 업소 행정처분 이력 확인,"식품접객업 행정처분, 무신고 업소, 행정처분 공개"
+building_register_issue,building_register_use,건축물대장 발급 및 열람,"건축물대장, 건축물대장 열람, 민원발급, 부동산정보"
+building_use_review,building_register_use,건축물 용도 적합성 확인,"건축물 용도, 근린생활시설, 용도변경, 건축과"
+building_violation_review,building_register_use,위반건축물 여부 확인,"위반건축물, 건축법 위반, 이행강제금, 건축과"
+fire_safety_completion,fire_safety,안전시설등 완비증명서,"안전시설등 완비증명, 소방완비증명, 소방서, 다중이용업소"
+outdoor_ad_report,outdoor_ad,옥외광고물 표시허가 및 신고,"옥외광고물, 간판, 광고물팀, 도시계획과, 가로경관과"
+road_occupation_permit,road_occupation,도로점용허가,"도로점용허가, 보도 점용, 건설관리과, 도로과, 가로행정과"
+business_registration,tax_registration,사업자등록 신청,"사업자등록, 홈택스, 세무서, 관할 세무서"
+ecommerce_report,ecommerce_local_economy,통신판매업신고,"통신판매업신고, 일자리경제과, 지역경제과, 경제진흥과"

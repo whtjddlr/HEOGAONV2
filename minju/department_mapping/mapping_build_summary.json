@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-06-13",
+  "district_count": 25,
+  "office_location_count": 25,
+  "graph_function_count": 7,
+  "local_task_count": 10,
+  "mapping_row_count": 250,
+  "mapping_rows_with_office_address_count": 250,
+  "mapping_rows_with_office_coordinate_count": 200,
+  "address_based_office_location_count": 50,
+  "geocode_source": "static_snapshot",
+  "officially_sourced_row_count": 250,
+  "all_rows_officially_sourced": true,
+  "outputs": [
+    "seoul_districts.csv",
+    "seoul_office_locations.csv",
+    "department_functions.csv",
+    "local_department_tasks.csv",
+    "seoul_department_mapping.csv",
+    "source_index.csv",
+    "seoul_department_mapping.sqlite"
+  ]
+}

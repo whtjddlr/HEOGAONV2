@@ -262,7 +262,9 @@ class LocalGraphRagRetriever:
 
     def __init__(self, root: Path | None = None) -> None:
         repo_root = root or Path(__file__).resolve().parents[3]
-        self.graph_root = repo_root / "minju_new" / "graph"
+        minju_graph_root = repo_root / "minju" / "graph"
+        legacy_graph_root = repo_root / "minju_new" / "graph"
+        self.graph_root = minju_graph_root if minju_graph_root.exists() else legacy_graph_root
         self.final_graph_root = self.graph_root / "output" / "final_graph"
         self.nodes_path = self.final_graph_root / "graph_nodes_high_precision.csv"
         self.edges_path = self.final_graph_root / "graph_edges_high_precision.csv"
