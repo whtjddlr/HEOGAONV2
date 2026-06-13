@@ -166,8 +166,12 @@ class CaseFlowService:
 
     def route_after_answer_review(self, case: dict[str, Any]) -> dict[str, Any]:
         analysis = case.get("lastAnswerAnalysis") or {}
-        if analysis.get("newMissingFields"):
-            self.questions.add_followup_questions(case, analysis["newMissingFields"])
+        # 분석은 한 번만 소비한다. 비우지 않으면 ANSWER_REVIEW 재진입마다 같은
+        # newMissingFields를 다시 처리해 후속 질문↔진단 사이를 무한 반복한다.
+        case["lastAnswerAnalysis"] = {}
+        followups = self.questions.followup_fields(case, analysis.get("newMissingFields") or [])
+        if followups:
+            self.questions.add_followup_questions(case, followups)
             return self.questions.start_or_finish_question_loop(case)
         if analysis.get("newInquiryTasks"):
             case["machineState"] = "INQUIRY"

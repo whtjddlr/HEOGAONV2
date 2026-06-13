@@ -101,8 +101,22 @@ class QuestionPlanner:
         case["questionLoop"]["current"] = None
         case["questionLoop"]["stopReason"] = reason
         case["machineState"] = "DIAGNOSIS"
-        case["documents"] = self.documents.build_documents(case)
-        case["inquiryTasks"] = self.inquiries.build_inquiry_tasks(case)
+        # 최초 진단 때만 생성한다. 후속 질문으로 재진입할 때 다시 만들면 이미 완료/해결한
+        # 서류·문의 진행 상태가 초기화되어 완료(SUBMITTED) 화면에 영영 도달하지 못한다.
+        if not case.get("documents"):
+            case["documents"] = self.documents.build_documents(case)
+        if not case.get("inquiryTasks"):
+            case["inquiryTasks"] = self.inquiries.build_inquiry_tasks(case)
+
+    def followup_fields(self, case: dict[str, Any], fields: list[str]) -> list[str]:
+        """후속 질문으로 실제로 물을 수 있는 슬롯 필드만 남긴다.
+
+        LLM 상담 분석이 슬롯키가 아닌 서술형 문장(예: '간판 허가·신고 필요 여부')을
+        반환하는 경우를 걸러내, 의미 없는 후속 질문과 무한 루프를 막는다.
+        """
+        known = {item["field"] for item in QUESTION_BANK}
+        answered = set(case["questionLoop"]["answeredFields"])
+        return [field for field in fields if field in known and field not in answered]
 
     def apply_slot_answer(self, case: dict[str, Any], input_payload: dict[str, Any]) -> None:
         loop = case["questionLoop"]
