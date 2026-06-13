@@ -5,19 +5,21 @@ import { DocumentsView } from "@/components/views/DocumentsView";
 import { InquiryView } from "@/components/views/InquiryView";
 import { SlotQuestionView } from "@/components/views/SlotQuestionView";
 import { SubmittedView } from "@/components/views/SubmittedView";
-import type { ApiView, DocumentItem, FlowActionId } from "@/types/flow";
+import type { ApiView, DocumentItem, FlowActionId, VisitLocation } from "@/types/flow";
 
 export function FlowView({
   view,
   selectedIds,
   freeText,
   consultationText,
+  visitLocation,
   activeDocument,
   completedDocumentIds,
   onSelectIds,
   onFreeText,
   onUnknown,
   onConsultationText,
+  onVisitLocation,
   onChannel,
   onToggleDocument,
   onOpenDocument,
@@ -30,12 +32,14 @@ export function FlowView({
   selectedIds: string[];
   freeText: string;
   consultationText: string;
+  visitLocation: VisitLocation | null;
   activeDocument: DocumentItem | null;
   completedDocumentIds: string[];
   onSelectIds: (ids: string[]) => void;
   onFreeText: (value: string) => void;
   onUnknown: () => void;
   onConsultationText: (value: string) => void;
+  onVisitLocation: (location: VisitLocation) => void;
   onChannel: (channel: "phone" | "online" | "visit") => void;
   onToggleDocument: (documentId: string, completed: boolean) => void;
   onOpenDocument: (document: DocumentItem) => void;
@@ -73,7 +77,16 @@ export function FlowView({
   }
 
   if (view.type === "inquiry") {
-    return <InquiryView view={view} value={consultationText} onChange={onConsultationText} onChannel={onChannel} />;
+    return (
+      <InquiryView
+        view={view}
+        value={consultationText}
+        visitLocation={visitLocation}
+        onChange={onConsultationText}
+        onVisitLocation={onVisitLocation}
+        onChannel={onChannel}
+      />
+    );
   }
 
   if (view.type === "answer_review") return <AnswerReviewView view={view} />;
