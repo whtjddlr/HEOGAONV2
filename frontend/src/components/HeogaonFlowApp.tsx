@@ -192,7 +192,7 @@ export function HeogaonFlowApp() {
           <section className="screen active" data-screen="question">
             <QuestionHeader progress={progress} onBack={() => setResetConfirmOpen(true)} onHistory={() => setHistoryOpen(true)} />
             <div className="question-main">
-              {error ? <p className="collect-status error-text">{error}</p> : null}
+              {error ? <p className="collect-status error-text" role="alert">{error}</p> : null}
               <FlowView
                 view={view}
                 selectedIds={selectedIds}

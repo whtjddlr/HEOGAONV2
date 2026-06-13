@@ -55,8 +55,8 @@
         }
 
         .send-button {
-          width: 40px;
-          height: 40px;
+          width: 44px;
+          height: 44px;
         }
 
         .dashboard-continue {
@@ -184,7 +184,9 @@
       }
 
       .app[data-question-type="submitted"] .summary-view,
-      .app[data-question-type="submitted_documents"] .summary-view {
+      .app[data-question-type="submitted_documents"] .summary-view,
+      .app[data-question-type="submitted"] .submitted-ending,
+      .app[data-question-type="submitted_documents"] .submitted-ending {
         padding-bottom: 104px;
       }
 
@@ -971,19 +973,19 @@
       }
 
       .send-button {
-        width: 42px;
-        height: 42px;
+        width: 44px;
+        height: 44px;
         border-radius: 13px;
       }
 
       .question-header-top {
-        min-height: 40px;
+        min-height: 44px;
       }
 
       .icon-button,
       .history-button {
-        width: 40px;
-        height: 40px;
+        width: 44px;
+        height: 44px;
         border-radius: 13px;
         background: #f6f9fd;
         color: #576578;
@@ -1292,8 +1294,8 @@
       }
 
       .document-detail-close {
-        width: 38px;
-        height: 38px;
+        width: 44px;
+        height: 44px;
         border-radius: 12px;
         font-size: 20px;
       }
@@ -1541,8 +1543,8 @@
         }
 
         .send-button {
-          width: 42px;
-          height: 42px;
+          width: 44px;
+          height: 44px;
           border-radius: 13px;
         }
 

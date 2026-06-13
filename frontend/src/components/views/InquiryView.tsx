@@ -97,7 +97,7 @@ export function InquiryView({
             <div className="detail-box">
               <textarea className="followup-field" value={view.onlineDraft.body} readOnly rows={9} />
             </div>
-            {copyStatus ? <p className="online-copy-status">{copyStatus}</p> : null}
+            <p className="online-copy-status" role="status" aria-live="polite">{copyStatus}</p>
           </section>
         ) : null}
         {view.mode === "visit" ? (

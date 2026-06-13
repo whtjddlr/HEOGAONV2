@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect } from "react";
 import { Icon } from "@/components/common/Icon";
 import type { ApiEnvelope, FlowActionId } from "@/types/flow";
 
@@ -37,6 +40,15 @@ export function HistoryPanel({
   const nextFocus = focusText(envelope);
   const recentAnswers = answers.slice(-4).reverse();
 
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   return (
     <div
       className={`history-panel${open ? " open" : ""}`}
@@ -45,12 +57,17 @@ export function HistoryPanel({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="history-sheet" aria-label="진행 현황">
+      <section
+        className="history-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-title"
+      >
         <span className="history-grabber" aria-hidden="true" />
         <div className="history-head">
           <div>
             <p className="history-eyebrow">진행 상황</p>
-            <h2 className="history-title">할 일</h2>
+            <h2 className="history-title" id="history-title">할 일</h2>
           </div>
           <button className="icon-button" type="button" aria-label="닫기" onClick={onClose}>
             <Icon name="close" />

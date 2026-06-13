@@ -23,7 +23,7 @@ export function SlotQuestionView({
       <span className="question-loop-chip">질문 {view.loop.totalAsked}/{plannedTotal}</span>
       <h1 className="question-title">{view.title}</h1>
       {view.subtitle ? <p className="question-sub">{view.subtitle}</p> : null}
-      {view.validationMessage ? <p className="collect-status error-text">{view.validationMessage}</p> : null}
+      {view.validationMessage ? <p className="collect-status error-text" role="alert">{view.validationMessage}</p> : null}
       {view.inputMode === "free_text" ? (
         <div className="detail-form slot-free-text">
           <div className="detail-box">

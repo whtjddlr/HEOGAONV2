@@ -10,7 +10,7 @@ export function AnalysisLoadingScreen() {
           <span />
           <span />
         </div>
-        <h1 className="analysis-loading-title">AI가 확인 중이에요</h1>
+        <h1 className="analysis-loading-title">AI가 분석 중이에요</h1>
         <p className="analysis-loading-sub">필요한 질문과 서류를 찾고 있어요.</p>
         <div className="analysis-loading-track" aria-hidden="true">
           <span />

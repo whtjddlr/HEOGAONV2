@@ -410,6 +410,10 @@
         text-align: right;
       }
 
+      .online-copy-status:empty {
+        display: none;
+      }
+
       .followup-file-input {
         display: none;
       }
