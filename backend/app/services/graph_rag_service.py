@@ -101,7 +101,8 @@ class GraphRagService:
 
         local_result = self.local_graph.retrieve(kind, case, extra=extra)
         if self._result_has_items(kind, local_result):
-            case.setdefault("ai", {})["graphRagBackend"] = "local_files"
+            source = local_result.get("source") if isinstance(local_result, dict) else ""
+            case.setdefault("ai", {})["graphRagBackend"] = "local_minju" if source == "minju" else "local_files"
             return local_result
 
         return remote_result

@@ -3,580 +3,548 @@ from __future__ import annotations
 import csv
 import json
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 
-@dataclass(frozen=True)
-class LocalDocumentRule:
-    id: str
-    title: str
-    graph_names: tuple[str, ...]
-    priority: int
-    status: str
-    statutory_deadline: str
-    perceived_duration: str
-    reason: str
-    unlocks: str
-    can_prepare_before_inquiry: bool
-    condition: str = "always"
+BASE_DOCUMENT_KEYS = {
+    "building_register",
+    "food_business_report_form",
+    "hygiene_training_certificate",
+    "health_exam_result",
+    "lease_contract",
+    "id_card",
+    "food_business_report_certificate",
+    "business_registration_application",
+    "business_registration_certificate",
+}
 
+CONDITION_DOCUMENT_KEYS = {
+    "fire": {"fire_safety_completion_certificate"},
+    "lpg": {"lpg_completion_certificate"},
+    "signage": {"outdoor_ad_application", "outdoor_ad_design_photo", "outdoor_ad_owner_consent"},
+    "outdoor": {"road_occupation_application", "road_location_plan", "road_excavation_drawings"},
+    "online": {"ecommerce_purchase_safety"},
+}
 
-@dataclass(frozen=True)
-class LocalInquiryRule:
-    id: str
-    title: str
-    graph_names: tuple[str, ...]
-    default_department: str
-    reason: str
-    questions: tuple[str, ...]
-    condition: str = "always"
+PREPARE_BEFORE_INQUIRY = {
+    "building_register",
+    "hygiene_training_certificate",
+    "health_exam_result",
+    "lease_contract",
+    "id_card",
+}
 
+BLOCKED_UNTIL_PREVIOUS = {
+    "food_business_report_certificate",
+    "business_registration_application",
+    "business_registration_certificate",
+}
 
-DOCUMENT_RULES: tuple[LocalDocumentRule, ...] = (
-    LocalDocumentRule(
-        id="building-ledger",
-        title="건축물대장 확인",
-        graph_names=(
-            "건축물대장 확인(용도 및 위반 여부)",
-            "건축물대장 발급 및 열람",
-            "건축물대장 용도 확인",
-            "건축물 용도 판정",
-            "위반건축물 여부 확인",
-        ),
-        priority=1,
-        status="needs_check",
-        statutory_deadline="즉시",
-        perceived_duration="즉시",
-        reason="계약 전 건물 용도와 위반 여부를 확인해야 해요.",
-        unlocks="임대차계약, 영업신고 검토",
-        can_prepare_before_inquiry=True,
-    ),
-    LocalDocumentRule(
-        id="health-check",
-        title="건강진단결과서",
-        graph_names=("건강진단결과서", "건강진단결과서 발급"),
-        priority=2,
-        status="not_started",
-        statutory_deadline="즉시",
-        perceived_duration="4~5일",
-        reason="식품접객 영업신고 전에 종사자 건강진단결과서가 필요할 수 있어요.",
-        unlocks="식품접객업 영업신고증",
-        can_prepare_before_inquiry=True,
-    ),
-    LocalDocumentRule(
-        id="hygiene-education",
-        title="위생교육 수료증",
-        graph_names=("위생교육 수료증", "위생교육 이수"),
-        priority=3,
-        status="not_started",
-        statutory_deadline="즉시",
-        perceived_duration="1일",
-        reason="영업 종류에 맞는 위생교육 이수 여부를 확인해요.",
-        unlocks="식품접객업 영업신고증",
-        can_prepare_before_inquiry=True,
-    ),
-    LocalDocumentRule(
-        id="food-business-report",
-        title="식품접객업 영업신고증",
-        graph_names=("식품접객업 영업신고증", "식품관련영업신고", "영업신고", "영업신고 신청", "영업신고증 발급"),
-        priority=4,
-        status="needs_check",
-        statutory_deadline="즉시",
-        perceived_duration="방문 시 즉시",
-        reason="선행 서류와 건물 조건을 확인한 뒤 영업신고를 진행해요.",
-        unlocks="사업자등록증, 간판 허가 신청",
-        can_prepare_before_inquiry=False,
-    ),
-    LocalDocumentRule(
-        id="fire-safety",
-        title="안전시설등 완비증명서",
-        graph_names=("안전시설등 완비증명서", "안전시설등 완비증명서 필요 여부 확인", "소방시설 현장 실사 준비"),
-        priority=5,
-        status="needs_check",
-        statutory_deadline="3~7일",
-        perceived_duration="5~7일",
-        reason="면적, 층수, 다중이용업소 요건에 따라 필요 여부를 확인해야 해요.",
-        unlocks="식품접객업 영업신고증",
-        can_prepare_before_inquiry=False,
-        condition="fire",
-    ),
-    LocalDocumentRule(
-        id="lpg-certificate",
-        title="액화석유가스 완성검사필증",
-        graph_names=("액화석유가스 완성검사필증", "LPG 사용 여부 확인"),
-        priority=6,
-        status="needs_check",
-        statutory_deadline="즉시",
-        perceived_duration="3~5일",
-        reason="LPG 등 가스 사용 시설이면 완성검사 대상 여부를 확인해요.",
-        unlocks="식품접객업 영업신고증",
-        can_prepare_before_inquiry=False,
-        condition="lpg",
-    ),
-    LocalDocumentRule(
-        id="business-registration",
-        title="사업자등록증",
-        graph_names=("사업자등록증", "사업자등록 신청", "사업자등록증 발급"),
-        priority=7,
-        status="blocked",
-        statutory_deadline="20일 이내",
-        perceived_duration="즉시~1일",
-        reason="인허가 신고 업종은 영업신고증을 준비한 뒤 사업자등록을 진행해요.",
-        unlocks="카드단말기, POS, 세금계산서 등 매출 활동",
-        can_prepare_before_inquiry=False,
-    ),
-    LocalDocumentRule(
-        id="signage-report",
-        title="옥외광고물(간판) 허가 및 신고증",
-        graph_names=("옥외광고물(간판) 허가 및 신고증", "옥외광고물 등의 표시허가(신고)", "간판 규격 위치 표시방법 확인"),
-        priority=8,
-        status="needs_check",
-        statutory_deadline="7일 이내",
-        perceived_duration="3~5일",
-        reason="간판 위치, 크기, 표시방법이 허가·신고 기준에 맞는지 확인해요.",
-        unlocks="합법적인 외부 간판 설치",
-        can_prepare_before_inquiry=False,
-        condition="signage",
-    ),
-    LocalDocumentRule(
-        id="road-occupation",
-        title="도로점용허가",
-        graph_names=("도로점용허가", "도로점용허가 대상 확인", "도로 점용 위치 및 면적 확인"),
-        priority=9,
-        status="needs_check",
-        statutory_deadline="확인 필요",
-        perceived_duration="확인 필요",
-        reason="외부 테이블이나 입간판이 공공 도로·보도를 점용하는지 확인해요.",
-        unlocks="외부 공간 사용",
-        can_prepare_before_inquiry=False,
-        condition="outdoor",
-    ),
-    LocalDocumentRule(
-        id="online-sales-report",
-        title="통신판매업신고",
-        graph_names=("통신판매업신고", "통신판매업"),
-        priority=10,
-        status="needs_check",
-        statutory_deadline="확인 필요",
-        perceived_duration="2~3일",
-        reason="온라인 주문이나 택배 판매가 있으면 별도 신고 여부를 확인해요.",
-        unlocks="온라인 판매",
-        can_prepare_before_inquiry=False,
-        condition="online",
-    ),
-)
-
-
-INQUIRY_RULES: tuple[LocalInquiryRule, ...] = (
-    LocalInquiryRule(
-        id="food-business-type",
-        title="영업신고 유형 확인",
-        graph_names=("식품관련영업신고", "영업신고", "건축물대장 용도 확인"),
-        default_department="식품위생 업무 담당부서",
-        reason="가게 조건에 맞는 식품접객업 신고 유형과 선행 확인 항목을 확인해야 해요.",
-        questions=(
-            "제 가게는 어떤 영업신고 유형을 보면 될까요?",
-            "건축물 용도나 객석 기준으로 더 확인할 서류가 있나요?",
-            "지금 먼저 준비해도 되는 서류와 문의 후 준비할 서류가 무엇인가요?",
-        ),
-    ),
-    LocalInquiryRule(
-        id="liquor-business-type",
-        title="주류 판매 가능 업종 확인",
-        graph_names=("주류 판매 가능 업종 및 일반음식점 전환 여부 확인", "주류 판매 여부 확인"),
-        default_department="식품위생 업무 담당부서",
-        reason="주류 판매 계획이 있으면 일반음식점 등 가능한 업종을 확인해야 해요.",
-        questions=(
-            "주류 판매가 가능한 영업신고 유형은 무엇인가요?",
-            "현재 계획한 업종에서 일반음식점 전환 검토가 필요한가요?",
-        ),
-        condition="liquor",
-    ),
-    LocalInquiryRule(
-        id="fire-safety-check",
-        title="안전시설등 완비증명서 대상 확인",
-        graph_names=("안전시설등 완비증명서 필요 여부 확인", "안전시설등 완비증명서", "소방시설 현장 실사 준비"),
-        default_department="소방 안전 업무 담당부서",
-        reason="면적, 층수, 구조에 따라 소방 완비증명 대상 여부가 달라질 수 있어요.",
-        questions=(
-            "이 영업장이 안전시설등 완비증명서 대상인가요?",
-            "현장 확인 전에 준비할 도면이나 서류가 있나요?",
-        ),
-        condition="fire",
-    ),
-    LocalInquiryRule(
-        id="signage-check",
-        title="간판 허가·신고 확인",
-        graph_names=("옥외광고물 등의 표시허가(신고)", "간판 규격 위치 표시방법 확인"),
-        default_department="옥외광고물 관리 업무 담당부서",
-        reason="간판 설치 계획이 있으면 표시 허가·신고 기준을 확인해야 해요.",
-        questions=(
-            "제 간판은 허가와 신고 중 어느 절차가 필요한가요?",
-            "도안, 사진, 설치 위치 중 어떤 자료를 먼저 준비하면 되나요?",
-        ),
-        condition="signage",
-    ),
-    LocalInquiryRule(
-        id="road-occupation-check",
-        title="외부 공간 사용 확인",
-        graph_names=("도로점용허가", "도로 점용 위치 및 면적 확인"),
-        default_department="도로점용 업무 담당부서",
-        reason="외부 테이블이나 입간판이 공공 도로·보도에 걸치는지 확인해야 해요.",
-        questions=(
-            "이 외부 공간이 도로점용허가 대상인지 확인하려면 어떤 자료가 필요한가요?",
-            "위치도와 평면도는 어느 수준으로 준비하면 되나요?",
-        ),
-        condition="outdoor",
-    ),
-    LocalInquiryRule(
-        id="online-sales-check",
-        title="통신판매업 신고 확인",
-        graph_names=("통신판매업신고", "통신판매업"),
-        default_department="통신판매 및 지역경제 업무 담당부서",
-        reason="온라인 판매 계획이 있으면 통신판매업 신고 대상 여부를 확인해야 해요.",
-        questions=(
-            "온라인 주문이나 택배 판매가 통신판매업 신고 대상인가요?",
-            "구매안전서비스 이용확인증 등 먼저 준비할 자료가 있나요?",
-        ),
-        condition="online",
-    ),
-    LocalInquiryRule(
-        id="takeover-check",
-        title="영업자 지위승계 확인",
-        graph_names=("영업자 지위승계 신고", "기존 업소 행정처분 이력 확인"),
-        default_department="식품위생 업무 담당부서",
-        reason="기존 가게를 인수하면 지위승계와 행정처분 이력 확인이 필요할 수 있어요.",
-        questions=(
-            "기존 영업자의 지위승계 신고가 필요한 상황인가요?",
-            "기존 업소 행정처분 이력은 어디에서 확인하나요?",
-        ),
-        condition="takeover",
-    ),
-)
+DISTRICT_CODES = {
+    "종로구": "11110",
+    "중구": "11140",
+    "용산구": "11170",
+    "성동구": "11200",
+    "광진구": "11215",
+    "동대문구": "11230",
+    "중랑구": "11260",
+    "성북구": "11290",
+    "강북구": "11305",
+    "도봉구": "11320",
+    "노원구": "11350",
+    "은평구": "11380",
+    "서대문구": "11410",
+    "마포구": "11440",
+    "양천구": "11470",
+    "강서구": "11500",
+    "구로구": "11530",
+    "금천구": "11545",
+    "영등포구": "11560",
+    "동작구": "11590",
+    "관악구": "11620",
+    "서초구": "11650",
+    "강남구": "11680",
+    "송파구": "11710",
+    "강동구": "11740",
+}
 
 
 class LocalGraphRagRetriever:
-    """Read the checked-in Minju graph package as a local GraphRAG source."""
+    """Use the checked-in minju data package as the primary local GraphRAG source."""
 
     def __init__(self, root: Path | None = None) -> None:
         repo_root = root or Path(__file__).resolve().parents[3]
-        minju_graph_root = repo_root / "minju" / "graph"
-        legacy_graph_root = repo_root / "minju_new" / "graph"
-        self.graph_root = minju_graph_root if minju_graph_root.exists() else legacy_graph_root
+        self.minju_root = repo_root / "minju"
+        self.graph_root = self.minju_root / "graph"
         self.final_graph_root = self.graph_root / "output" / "final_graph"
         self.nodes_path = self.final_graph_root / "graph_nodes_high_precision.csv"
         self.edges_path = self.final_graph_root / "graph_edges_high_precision.csv"
         self.evidence_path = self.graph_root / "input" / "evidence" / "evidence_chunks_augmented.jsonl"
+        self.document_root = self.minju_root / "document_issue_guide"
+        self.department_root = self.minju_root / "department_mapping"
+        self.form_root = self.minju_root / "form_templates"
+        self._core_documents: list[dict[str, str]] | None = None
+        self._all_documents: list[dict[str, str]] | None = None
+        self._food_documents: list[dict[str, str]] | None = None
+        self._prerequisites: list[dict[str, str]] | None = None
+        self._department_tasks: list[dict[str, str]] | None = None
+        self._department_mappings: list[dict[str, str]] | None = None
+        self._form_catalog: dict[str, Any] | None = None
         self._edges: list[dict[str, str]] | None = None
         self._evidence_chunks: list[dict[str, Any]] | None = None
 
     @property
     def available(self) -> bool:
-        return self.nodes_path.exists() and self.edges_path.exists()
+        return (
+            (self.document_root / "document_issue_guide.csv").exists()
+            and (self.department_root / "seoul_department_mapping.csv").exists()
+        )
 
     def retrieve(self, kind: str, case: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any] | None:
         if not self.available:
             return None
         if kind == "documents":
             documents = self.build_documents(case)
-            return {"documents": documents, "source": "local_graph_rag"} if documents else None
+            return {"documents": documents, "source": "minju"} if documents else None
         if kind == "inquiries":
             tasks = self.build_inquiry_tasks(case)
-            return {"inquiryTasks": tasks, "source": "local_graph_rag"} if tasks else None
+            return {"inquiryTasks": tasks, "source": "minju"} if tasks else None
+        if kind == "questions":
+            questions = self.build_question_plan(case)
+            return {"questions": questions, "source": "minju"} if questions else None
         if kind == "evidence":
             topic = str((extra or {}).get("topic") or "")
             evidence = self.search_evidence(case, topic)
-            return {"evidence": evidence, "source": "local_graph_rag"} if evidence else None
+            return {"evidence": evidence, "source": "minju"} if evidence else None
         return None
 
     def build_documents(self, case: dict[str, Any]) -> list[dict[str, Any]]:
-        signals = self._signals(case)
+        selected_keys = self._selected_document_keys(case)
+        rows = [row for row in self.core_documents if row.get("document_key") in selected_keys]
         documents = []
-        for rule in DOCUMENT_RULES:
-            if not self._condition_applies(rule.condition, signals):
-                continue
-            related_edges = self._related_edges(rule.graph_names)
-            prerequisite_edges = [
-                edge
-                for edge in related_edges
-                if edge.get("predicate") in {"requires_prerequisite", "requires_document", "needs_check", "precedes"}
-            ]
-            prerequisites = self._object_names(prerequisite_edges, limit=4)
-            evidence = self._evidence_from_edges(related_edges, limit=3)
+        for priority, row in enumerate(rows, start=1):
+            key = row["document_key"]
+            prerequisites = self._prerequisites_for(row["document_name"])
+            form_info = self._form_info(row["document_name"])
             documents.append({
-                "id": rule.id,
-                "title": rule.title,
-                "priority": rule.priority,
-                "reason": rule.reason,
-                "status": rule.status,
-                "statutoryDeadline": rule.statutory_deadline,
-                "perceivedDuration": rule.perceived_duration,
-                "prerequisites": ", ".join(prerequisites) if prerequisites else "기본 신청 정보",
-                "unlocks": rule.unlocks,
-                "officialLinks": self._official_links(related_edges),
-                "prepareInfo": prerequisites or self._fallback_prepare_info(rule),
-                "steps": self._steps_for(rule, related_edges),
-                "canPrepareBeforeInquiry": rule.can_prepare_before_inquiry,
-                "evidence": evidence,
+                "id": self._slug(key or row["document_name"]),
+                "title": row["document_name"],
+                "priority": priority,
+                "reason": row.get("required_for") or "민주 데이터 기준으로 준비가 필요한 서류입니다.",
+                "status": "blocked" if key in BLOCKED_UNTIL_PREVIOUS else "needs_check",
+                "statutoryDeadline": row.get("when_needed") or "확인 필요",
+                "perceivedDuration": self._duration_for(row),
+                "prerequisites": row.get("prerequisite_summary") or "준비 조건 확인 필요",
+                "unlocks": row.get("submit_to") or row.get("required_for") or "다음 인허가 단계",
+                "officialLinks": self._official_links(row),
+                "prepareInfo": self._prepare_info(row, prerequisites, form_info),
+                "steps": self._steps_for(row, prerequisites),
+                "canPrepareBeforeInquiry": key in PREPARE_BEFORE_INQUIRY,
+                "evidence": self._evidence_for_row(row),
             })
-        return sorted(documents, key=lambda item: item["priority"])
+        return documents
 
     def build_inquiry_tasks(self, case: dict[str, Any]) -> list[dict[str, Any]]:
-        signals = self._signals(case)
+        documents = self.build_documents(case)
+        task_keys = self._ordered_unique(
+            self._task_key_for_document_id(document["id"])
+            for document in documents
+            if self._task_key_for_document_id(document["id"])
+        )
+        if not task_keys:
+            task_keys = ["food_business_report", "building_register_issue"]
+
+        district_code = self._district_code(case)
         tasks = []
-        for rule in INQUIRY_RULES:
-            if not self._condition_applies(rule.condition, signals):
-                continue
-            related_edges = self._related_edges(rule.graph_names)
-            department = self._department_for(rule.graph_names, rule.default_department)
-            checks = self._object_names(
-                [edge for edge in related_edges if edge.get("predicate") == "needs_check"],
-                limit=3,
-            )
-            questions = list(rule.questions)
-            questions.extend(f"{check}은 어떻게 확인하면 되나요?" for check in checks)
+        for task_key in task_keys:
+            task_meta = self._department_task(task_key)
+            mapping = self._department_mapping(task_key, district_code)
+            related_docs = [doc for doc in documents if self._task_key_for_document_id(doc["id"]) == task_key]
+            title = self._first(mapping, "local_task_label") or self._first(task_meta, "local_task_label") or task_key
+            department = self._department_label(mapping)
             tasks.append({
-                "id": rule.id,
-                "title": rule.title,
+                "id": self._slug(task_key),
+                "title": title,
                 "department": department,
-                "phone": "tel:120",
-                "onlineUrl": "https://www.epeople.go.kr/index.jsp",
-                "visitHint": f"관할 구청 {department}",
-                "reason": rule.reason,
+                "phone": self._phone(self._first(mapping, "phone")),
+                "onlineUrl": self._first(mapping, "source_url") or "https://www.epeople.go.kr/index.jsp",
+                "visitHint": self._visit_hint(mapping),
+                "reason": self._inquiry_reason(title, related_docs, mapping),
                 "status": "pending",
-                "questions": self._dedupe(questions)[:4],
-                "evidence": self._evidence_from_edges(related_edges, limit=2),
+                "questions": self._questions_for_task(title, related_docs, mapping),
+                "evidence": self._inquiry_evidence(related_docs, mapping),
             })
         return tasks
 
+    def build_question_plan(self, case: dict[str, Any]) -> list[dict[str, Any]]:
+        signals = self._signals(case)
+        questions: list[dict[str, Any]] = []
+        if not self._slot_value(case, "exact_address"):
+            questions.append({
+                "field": "exact_address",
+                "label": "정확한 주소",
+                "question": "사업장 주소가 정해졌나요?",
+                "why": "민주 부서 매핑 데이터는 자치구 기준으로 실제 담당부서와 연락처를 찾습니다.",
+                "inputMode": "free_text",
+                "required": True,
+            })
+        if self._slot_value(case, "on_site_consumption") is None:
+            questions.append({
+                "field": "on_site_consumption",
+                "label": "매장 취식 여부",
+                "question": "매장 안에서 손님이 먹고 갈 수 있나요?",
+                "why": "소방·식품영업 분기 서류가 달라질 수 있습니다.",
+                "inputMode": "single_select",
+                "required": True,
+                "options": [
+                    {"id": "yes", "title": "네, 매장 이용 가능"},
+                    {"id": "no", "title": "아니요, 포장이나 배달 중심"},
+                ],
+            })
+        if self._slot_value(case, "liquor_sales") is None:
+            questions.append({
+                "field": "liquor_sales",
+                "label": "주류 판매 여부",
+                "question": "주류도 판매할 계획인가요?",
+                "why": "업종 확인과 담당부서 문의 문안에 반영됩니다.",
+                "inputMode": "single_select",
+                "required": True,
+                "options": [
+                    {"id": "yes", "title": "네, 판매해요"},
+                    {"id": "no", "title": "아니요"},
+                ],
+            })
+        if "condition_screening" not in (case.get("slots") or {}):
+            options = [
+                {"id": "signage_planned", "title": "간판/옥외광고물 설치"},
+                {"id": "outdoor_space_planned", "title": "외부 테이블/보도 사용"},
+                {"id": "lpg_use", "title": "LPG 또는 가스 사용"},
+                {"id": "online_sales_planned", "title": "온라인 주문/배달 판매"},
+                {"id": "none", "title": "해당 없음", "exclusive": True},
+            ]
+            questions.append({
+                "field": "condition_screening",
+                "label": "추가 조건",
+                "question": "민주 데이터 기준으로 추가 확인할 조건이 있나요?",
+                "why": "간판, 도로점용, LPG, 통신판매 서류를 자동으로 추가합니다.",
+                "inputMode": "multi_select",
+                "required": False,
+                "options": options,
+            })
+        if signals.get("outdoor") and not self._slot_value(case, "building_use"):
+            questions.append({
+                "field": "building_use",
+                "label": "건축물 용도",
+                "question": "건축물대장상 용도를 알고 있나요?",
+                "why": "도로점용·영업신고 전 용도 적합성 확인이 필요합니다.",
+                "inputMode": "free_text",
+                "required": False,
+            })
+        return questions
+
     def search_evidence(self, case: dict[str, Any], topic: str) -> list[dict[str, str]]:
-        query = " ".join(
-            item
-            for item in [
+        tokens = self._tokens(
+            " ".join([
                 topic,
                 str(case.get("rawInput") or ""),
                 " ".join(str(slot.get("value") or "") for slot in (case.get("slots") or {}).values() if isinstance(slot, dict)),
-            ]
-            if item
+            ])
         )
-        tokens = self._tokens(query)
         if not tokens:
-            return []
+            tokens = {"식품", "영업", "신고"}
 
         candidates: list[tuple[int, dict[str, str]]] = []
-        for edge in self.seed_edges:
+        for row in [*self.core_documents, *self.food_documents, *self.all_documents]:
+            text = " ".join(str(row.get(key) or "") for key in ("document_name", "required_for", "when_needed", "evidence_text", "source_title"))
+            score = self._score(tokens, text)
+            if score:
+                candidates.append((score + 2, {
+                    "title": row.get("source_title") or row.get("document_name") or "민주 근거",
+                    "url": self._safe_url(row.get("source_url", "")),
+                    "excerpt": self._shorten(row.get("evidence_text") or row.get("prerequisite_summary") or ""),
+                }))
+        for edge in self.edges:
             text = " ".join(str(edge.get(key) or "") for key in ("subject_name", "object_name", "condition_text", "evidence_text", "title"))
             score = self._score(tokens, text)
             if score:
-                candidates.append((score + 2, self._evidence_item_from_edge(edge)))
-
-        for chunk in self.evidence_chunks:
-            text = " ".join(str(chunk.get(key) or "") for key in ("title", "section_path", "text", "source_record_id"))
-            score = self._score(tokens, text)
-            if score:
                 candidates.append((score, {
-                    "title": str(chunk.get("title") or chunk.get("source_record_id") or "근거"),
-                    "url": self._safe_url(str(chunk.get("source_url") or "")),
-                    "excerpt": self._shorten(str(chunk.get("text") or "")),
+                    "title": edge.get("source_title") or edge.get("subject_name") or "민주 그래프 근거",
+                    "url": self._safe_url(edge.get("source_url", "")),
+                    "excerpt": self._shorten(edge.get("evidence_text") or edge.get("condition_text") or ""),
                 }))
+        return self._top_unique_evidence(candidates)
 
-        results = []
-        seen = set()
-        for _, item in sorted(candidates, key=lambda candidate: candidate[0], reverse=True):
-            key = (item["title"], item["excerpt"])
-            if key in seen:
-                continue
-            seen.add(key)
-            results.append(item)
-            if len(results) >= 5:
-                break
-        return results
+    @property
+    def core_documents(self) -> list[dict[str, str]]:
+        if self._core_documents is None:
+            self._core_documents = self._read_csv(self.document_root / "document_issue_guide.csv")
+        return self._core_documents
+
+    @property
+    def all_documents(self) -> list[dict[str, str]]:
+        if self._all_documents is None:
+            self._all_documents = self._read_csv(self.document_root / "all_document_issue_guide.csv")
+        return self._all_documents
+
+    @property
+    def food_documents(self) -> list[dict[str, str]]:
+        if self._food_documents is None:
+            self._food_documents = self._read_csv(self.document_root / "food_permit_submission_documents.csv")
+        return self._food_documents
+
+    @property
+    def prerequisites(self) -> list[dict[str, str]]:
+        if self._prerequisites is None:
+            self._prerequisites = self._read_csv(self.document_root / "document_prerequisites.csv")
+        return self._prerequisites
+
+    @property
+    def department_tasks(self) -> list[dict[str, str]]:
+        if self._department_tasks is None:
+            self._department_tasks = self._read_csv(self.department_root / "local_department_tasks.csv")
+        return self._department_tasks
+
+    @property
+    def department_mappings(self) -> list[dict[str, str]]:
+        if self._department_mappings is None:
+            self._department_mappings = self._read_csv(self.department_root / "seoul_department_mapping.csv")
+        return self._department_mappings
+
+    @property
+    def form_catalog(self) -> dict[str, Any]:
+        if self._form_catalog is None:
+            path = self.form_root / "form_template_catalog.json"
+            self._form_catalog = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        return self._form_catalog
 
     @property
     def edges(self) -> list[dict[str, str]]:
         if self._edges is None:
-            with self.edges_path.open("r", encoding="utf-8-sig", newline="") as file:
-                self._edges = [dict(row) for row in csv.DictReader(file)]
+            self._edges = self._read_csv(self.edges_path)
         return self._edges
 
-    @property
-    def seed_edges(self) -> list[dict[str, str]]:
-        return [edge for edge in self.edges if edge.get("edge_source") == "source_backed_seed"]
+    def _selected_document_keys(self, case: dict[str, Any]) -> set[str]:
+        signals = self._signals(case)
+        keys = set(BASE_DOCUMENT_KEYS)
+        for condition, document_keys in CONDITION_DOCUMENT_KEYS.items():
+            if signals.get(condition):
+                keys.update(document_keys)
+        return keys
 
-    @property
-    def evidence_chunks(self) -> list[dict[str, Any]]:
-        if self._evidence_chunks is None:
-            chunks: list[dict[str, Any]] = []
-            if self.evidence_path.exists():
-                with self.evidence_path.open("r", encoding="utf-8") as file:
-                    for line in file:
-                        try:
-                            chunks.append(json.loads(line))
-                        except json.JSONDecodeError:
-                            continue
-            self._evidence_chunks = chunks
-        return self._evidence_chunks
-
-    def _related_edges(self, graph_names: tuple[str, ...]) -> list[dict[str, str]]:
-        names = {self._normalize_name(name) for name in graph_names}
-        return [
-            edge
-            for edge in self.seed_edges
-            if self._normalize_name(edge.get("subject_name", "")) in names
-            or self._normalize_name(edge.get("object_name", "")) in names
-        ]
-
-    def _department_for(self, graph_names: tuple[str, ...], default: str) -> str:
-        names = {self._normalize_name(name) for name in graph_names}
-        for edge in self.seed_edges:
-            if edge.get("predicate") != "handled_by":
-                continue
-            if self._normalize_name(edge.get("subject_name", "")) in names:
-                department = edge.get("object_name", "").strip()
-                if department:
-                    return f"{department} 담당부서"
-        return default
-
-    @staticmethod
-    def _signals(case: dict[str, Any]) -> dict[str, Any]:
-        slots = case.get("slots") or {}
-
-        def value(field: str) -> Any:
-            slot = slots.get(field)
-            return slot.get("value") if isinstance(slot, dict) else None
-
+    def _signals(self, case: dict[str, Any]) -> dict[str, bool]:
         raw = str(case.get("rawInput") or "")
-        conditions = value("condition_screening")
+        conditions = self._slot_value(case, "condition_screening")
         if not isinstance(conditions, list):
             conditions = [conditions] if conditions else []
+        condition_set = {str(item) for item in conditions}
         return {
-            "raw": raw,
-            "conditions": set(str(item) for item in conditions),
-            "on_site": value("on_site_consumption") is True or bool(re.search(r"매장|홀|객석|좌석|먹고", raw)),
-            "liquor": value("liquor_sales") is True or bool(re.search(r"주류|술|맥주|와인|소주", raw)),
-            "takeover": value("takeover_type") == "transfer" or bool(re.search(r"인수|양도|승계", raw)),
-            "signage": "signage_planned" in conditions or bool(re.search(r"간판|옥외광고", raw)),
-            "outdoor": "outdoor_space_planned" in conditions or bool(re.search(r"테라스|외부 ?테이블|보도|도로점용|입간판", raw)),
-            "lpg": "lpg_use" in conditions or bool(re.search(r"LPG|가스|화구", raw, flags=re.IGNORECASE)),
-            "online": "online_sales_planned" in conditions or bool(re.search(r"온라인|택배|배달앱|통신판매", raw)),
+            "fire": self._slot_value(case, "on_site_consumption") is True or "lpg_use" in condition_set or bool(re.search("객석|좌석|매장|지하|LPG|가스", raw, re.I)),
+            "lpg": "lpg_use" in condition_set or bool(re.search("LPG|가스", raw, re.I)),
+            "signage": "signage_planned" in condition_set or bool(re.search("간판|옥외광고", raw)),
+            "outdoor": "outdoor_space_planned" in condition_set or bool(re.search("테라스|야외|외부|보도|도로점용", raw)),
+            "online": "online_sales_planned" in condition_set or bool(re.search("온라인|배달|택배|통신판매", raw)),
         }
 
-    @staticmethod
-    def _condition_applies(condition: str, signals: dict[str, Any]) -> bool:
-        if condition == "always":
-            return True
-        if condition == "fire":
-            return bool(signals.get("on_site") or signals.get("lpg"))
-        return bool(signals.get(condition))
+    def _district_code(self, case: dict[str, Any]) -> str:
+        text = " ".join([
+            str(case.get("rawInput") or ""),
+            str(self._slot_value(case, "exact_address") or ""),
+        ])
+        for district, code in DISTRICT_CODES.items():
+            if district in text:
+                return code
+        return "11440"
 
-    @staticmethod
-    def _object_names(edges: list[dict[str, str]], limit: int) -> list[str]:
-        names = []
-        for edge in edges:
-            name = (edge.get("object_name") or "").strip()
-            if name and name not in names:
-                names.append(name)
-            if len(names) >= limit:
-                break
-        return names
+    def _department_task(self, task_key: str) -> dict[str, str]:
+        return next((row for row in self.department_tasks if row.get("local_task_key") == task_key), {})
 
-    @classmethod
-    def _evidence_from_edges(cls, edges: list[dict[str, str]], limit: int) -> list[str]:
-        evidence = []
-        for edge in edges:
-            for key in ("condition_text", "evidence_text"):
-                text = cls._shorten(edge.get(key) or "", max_length=180)
-                if text and text not in evidence:
-                    evidence.append(text)
-                if len(evidence) >= limit:
-                    return evidence
-        return evidence
-
-    @classmethod
-    def _steps_for(cls, rule: LocalDocumentRule, edges: list[dict[str, str]]) -> list[str]:
-        steps = []
-        for edge in edges:
-            if edge.get("predicate") == "precedes" and edge.get("subject_name"):
-                steps.append(f"{edge['subject_name']} 후 {edge.get('object_name', '다음 단계')}로 진행")
-        if steps:
-            return cls._dedupe(steps)[:3]
-        return [
-            f"{rule.title} 대상 여부 확인",
-            "공식 안내와 관할 부서 기준 확인",
-            "필요 서류 준비 상태 표시",
+    def _department_mapping(self, task_key: str, district_code: str) -> dict[str, str]:
+        exact = [
+            row for row in self.department_mappings
+            if row.get("district_code") == district_code and row.get("local_task_key") == task_key
         ]
+        if exact:
+            return exact[0]
+        fallback = [row for row in self.department_mappings if row.get("local_task_key") == task_key]
+        return fallback[0] if fallback else {}
+
+    def _task_key_for_document_id(self, document_id: str) -> str:
+        key = document_id.replace("-", "_")
+        row = next((item for item in self.core_documents if item.get("document_key") == key), None)
+        return (row or {}).get("submit_to_local_task_key", "")
+
+    def _prerequisites_for(self, document_name: str) -> list[str]:
+        values = [
+            row["prerequisite_name"]
+            for row in self.prerequisites
+            if row.get("target_document_or_step") == document_name and row.get("prerequisite_name")
+        ]
+        return self._ordered_unique(values)
+
+    def _form_info(self, document_name: str) -> dict[str, Any]:
+        documents = self.form_catalog.get("documents", [])
+        if not isinstance(documents, list):
+            return {}
+        normalized = self._normalize(document_name)
+        return next((item for item in documents if self._normalize(str(item.get("document_name") or "")) == normalized), {})
+
+    def _duration_for(self, row: dict[str, str]) -> str:
+        text = " ".join([row.get("when_needed", ""), row.get("issue_channel", "")])
+        if "즉시" in text or "온라인" in text:
+            return "즉시 또는 당일"
+        if "검사" in row.get("document_name", "") or "건강" in row.get("document_name", ""):
+            return "약 4~5일"
+        if "소방" in row.get("document_group", ""):
+            return "현장 확인 필요"
+        return "발급/준비처 확인"
+
+    def _prepare_info(self, row: dict[str, str], prerequisites: list[str], form_info: dict[str, Any]) -> list[str]:
+        values = [
+            row.get("issue_or_prepare_place", ""),
+            row.get("issue_channel", ""),
+            row.get("prerequisite_summary", ""),
+            *prerequisites,
+        ]
+        required_inputs = form_info.get("required_inputs")
+        if isinstance(required_inputs, list):
+            values.extend(str(item) for item in required_inputs[:4])
+        return self._ordered_unique(self._clean_parts(values))[:6] or ["준비 정보 확인 필요"]
+
+    def _steps_for(self, row: dict[str, str], prerequisites: list[str]) -> list[str]:
+        steps = [
+            row.get("prerequisite_summary", ""),
+            f"{row.get('issue_or_prepare_place', '발급/준비처')}에서 {row.get('document_name', '서류')} 준비",
+            row.get("submit_to", ""),
+        ]
+        steps.extend(prerequisites[:2])
+        return self._ordered_unique(self._clean_parts(steps))[:4]
+
+    def _official_links(self, row: dict[str, str]) -> list[dict[str, str]]:
+        url = self._safe_url(row.get("source_url", ""))
+        if not url:
+            return [{"label": "정부24에서 확인", "url": "https://www.gov.kr"}]
+        return [{"label": row.get("source_title") or "공식 근거", "url": url}]
+
+    def _evidence_for_row(self, row: dict[str, str]) -> list[str]:
+        return self._clean_parts([
+            self._shorten(row.get("evidence_text", ""), 180),
+            row.get("section_path", ""),
+        ])[:2]
+
+    def _department_label(self, mapping: dict[str, str]) -> str:
+        department = self._first(mapping, "actual_department_name") or "담당부서 확인 필요"
+        team = self._first(mapping, "actual_team_name")
+        district = self._first(mapping, "district_name")
+        return " ".join(item for item in [district, department, team] if item)
+
+    def _visit_hint(self, mapping: dict[str, str]) -> str:
+        office = self._first(mapping, "office_name") or "관할 구청"
+        address = self._first(mapping, "office_address")
+        return f"{office} ({address})" if address else office
+
+    def _inquiry_reason(self, title: str, docs: list[dict[str, Any]], mapping: dict[str, str]) -> str:
+        names = ", ".join(doc["title"] for doc in docs[:3])
+        evidence = self._first(mapping, "evidence_text")
+        if names:
+            return f"{title} 단계에서 {names} 제출/확인 기준을 담당부서에 확인해야 합니다."
+        return self._shorten(evidence, 160) or f"{title} 담당부서 확인이 필요합니다."
+
+    def _questions_for_task(self, title: str, docs: list[dict[str, Any]], mapping: dict[str, str]) -> list[str]:
+        questions = [
+            f"{title} 처리 기준과 접수 채널은 무엇인가요?",
+            "현재 주소와 업종 기준으로 추가 확인할 조건이 있나요?",
+        ]
+        for doc in docs[:3]:
+            questions.append(f"{doc['title']}은 어떤 형식으로 준비하거나 제출하면 되나요?")
+        if mapping.get("actual_team_name"):
+            questions.append(f"{mapping['actual_team_name']}에서 바로 확인 가능한 업무인가요?")
+        return self._ordered_unique(questions)[:5]
+
+    def _inquiry_evidence(self, docs: list[dict[str, Any]], mapping: dict[str, str]) -> list[str]:
+        evidence = [self._first(mapping, "evidence_text")]
+        for doc in docs:
+            evidence.extend(doc.get("evidence", []))
+        return self._ordered_unique(self._clean_parts(evidence))[:3]
 
     @staticmethod
-    def _fallback_prepare_info(rule: LocalDocumentRule) -> list[str]:
-        mapping = {
-            "building-ledger": ["정확한 주소", "층수", "위반건축물 여부"],
-            "health-check": ["창업자 및 종업원 인적사항", "보건소 또는 지정 의료기관"],
-            "hygiene-education": ["영업자 정보", "업종별 교육기관"],
-            "food-business-report": ["영업신고서", "건강진단결과서", "위생교육 수료증"],
-            "business-registration": ["영업신고증", "임대차계약서", "사업자 인적사항"],
-        }
-        return mapping.get(rule.id, ["신청 정보", "관할 부서 확인"])
+    def _slot_value(case: dict[str, Any], field: str) -> Any:
+        slot = (case.get("slots") or {}).get(field)
+        return slot.get("value") if isinstance(slot, dict) else None
 
-    @classmethod
-    def _official_links(cls, edges: list[dict[str, str]]) -> list[dict[str, str]]:
-        links = []
-        for edge in edges:
-            url = cls._safe_url(edge.get("source_url") or "")
-            if not url:
-                continue
-            label = "정부24" if "gov.kr" in url else "생활법령" if "easylaw.go.kr" in url else "공식 근거"
-            item = {"label": label, "url": url}
-            if item not in links:
-                links.append(item)
-            if len(links) >= 2:
-                break
-        return links or [{"label": "정부24에서 확인", "url": "https://www.gov.kr"}]
+    @staticmethod
+    def _read_csv(path: Path) -> list[dict[str, str]]:
+        if not path.exists():
+            return []
+        with path.open("r", encoding="utf-8-sig", newline="") as file:
+            return [dict(row) for row in csv.DictReader(file)]
 
-    @classmethod
-    def _evidence_item_from_edge(cls, edge: dict[str, str]) -> dict[str, str]:
-        return {
-            "title": edge.get("title") or edge.get("subject_name") or "근거",
-            "url": cls._safe_url(edge.get("source_url") or ""),
-            "excerpt": cls._shorten(edge.get("evidence_text") or edge.get("condition_text") or ""),
-        }
+    @staticmethod
+    def _first(mapping: dict[str, str], key: str) -> str:
+        return str(mapping.get(key) or "").strip()
+
+    @staticmethod
+    def _phone(value: str) -> str:
+        digits = re.sub(r"[^0-9+]", "", value or "")
+        return f"tel:{digits}" if digits else "tel:120"
 
     @staticmethod
     def _tokens(text: str) -> set[str]:
-        return {token.lower() for token in re.findall(r"[가-힣A-Za-z0-9]{2,}", text)}
+        return {token.lower() for token in re.findall(r"[가-힣A-Za-z0-9]{2,}", text or "")}
 
     @staticmethod
     def _score(tokens: set[str], text: str) -> int:
-        lower_text = text.lower()
+        lower_text = (text or "").lower()
         return sum(1 for token in tokens if token in lower_text)
 
     @staticmethod
-    def _normalize_name(value: str) -> str:
-        return re.sub(r"\s+", "", value or "")
+    def _normalize(value: str) -> str:
+        return re.sub(r"\s+|/|ㆍ|·", "", value or "")
 
     @staticmethod
-    def _dedupe(values: list[str] | tuple[str, ...]) -> list[str]:
-        items = []
-        for value in values:
-            text = str(value).strip()
-            if text and text not in items:
-                items.append(text)
-        return items
+    def _slug(value: str) -> str:
+        slug = re.sub(r"[^a-zA-Z0-9가-힣]+", "-", value or "").strip("-").lower()
+        return slug or "minju-item"
 
     @staticmethod
     def _safe_url(url: str) -> str:
-        url = url.strip()
+        url = (url or "").strip()
         if not url.startswith(("http://", "https://")) or "REDACTED" in url:
             return ""
         return url
 
     @staticmethod
     def _shorten(text: str, max_length: int = 220) -> str:
-        compact = re.sub(r"\s+", " ", text).strip()
+        compact = re.sub(r"\s+", " ", text or "").strip()
         if len(compact) <= max_length:
             return compact
         return compact[: max_length - 1].rstrip() + "…"
+
+    @staticmethod
+    def _clean_parts(values: list[str]) -> list[str]:
+        return [str(value).strip() for value in values if str(value).strip()]
+
+    @staticmethod
+    def _ordered_unique(values: Any) -> list[str]:
+        items: list[str] = []
+        for value in values:
+            text = str(value or "").strip()
+            if text and text not in items:
+                items.append(text)
+        return items
+
+    def _top_unique_evidence(self, candidates: list[tuple[int, dict[str, str]]]) -> list[dict[str, str]]:
+        results = []
+        seen = set()
+        for _, item in sorted(candidates, key=lambda candidate: candidate[0], reverse=True):
+            key = (item["title"], item["excerpt"])
+            if key in seen or not item["excerpt"]:
+                continue
+            seen.add(key)
+            results.append(item)
+            if len(results) >= 5:
+                break
+        return results
 
 
 local_graph_rag = LocalGraphRagRetriever()

@@ -25,6 +25,7 @@ app/
   data/catalog.py                MVP question/document rule seeds
   services/
     graph_rag_service.py         GraphRAG retrieve boundary and response normalizer
+    local_graph_rag.py           minju data package adapter for questions/documents/inquiries/evidence
     flow_service.py              state-machine orchestration
     intake_agent.py              natural language -> slots
     question_planner.py          backend-owned question loop
@@ -65,7 +66,17 @@ GRAPH_RAG_TIMEOUT_SECONDS=8
 
 The backend calls `POST {GRAPH_RAG_BASE_URL}/retrieve` with `kind` set to `questions`, `documents`, `inquiries`, or `evidence`.
 
-If the remote GraphRAG service is disabled, unreachable, or returns an invalid shape, the backend first tries the checked-in local graph package at `minju/graph/output/final_graph` and falls back to `minju_new/graph/output/final_graph` for older checkouts. If neither local graph can produce a valid response, the affected area falls back to `app/data/catalog.py`. The state machine, retry limits, and next-screen routing stay in FastAPI.
+If the remote GraphRAG service is disabled, unreachable, or returns an invalid shape, the backend uses the checked-in `minju/` data package as the primary local domain source before falling back to `app/data/catalog.py`.
+
+The local minju adapter reads:
+
+- `minju/document_issue_guide/document_issue_guide.csv` for the core document checklist.
+- `minju/document_issue_guide/document_prerequisites.csv` for preparation steps.
+- `minju/department_mapping/seoul_department_mapping.csv` and `local_department_tasks.csv` for district-specific inquiry tasks, departments, phones, and visit hints.
+- `minju/form_templates/form_template_catalog.json` for AI-preparable form inputs.
+- `minju/graph/output/final_graph` and evidence chunks for supporting evidence search.
+
+The state machine, retry limits, and next-screen routing stay in FastAPI. Minju provides domain data; it does not control screen transitions.
 
 ## Run
 

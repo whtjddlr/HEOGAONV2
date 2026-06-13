@@ -1,5 +1,20 @@
 # GraphRAG Integration
 
+## Local minju data source
+
+HEOGAON V2 treats the checked-in `minju/` directory as the primary local GraphRAG/domain-data package whenever a remote GraphRAG server is not available or does not return usable data.
+
+The backend adapter is `backend/app/services/local_graph_rag.py`. It reads minju data directly instead of relying on the old hardcoded MVP catalog:
+
+- Core document checklist: `minju/document_issue_guide/document_issue_guide.csv`
+- Document preparation details: `minju/document_issue_guide/document_prerequisites.csv`
+- District-specific departments and phone numbers: `minju/department_mapping/seoul_department_mapping.csv`
+- Local task labels: `minju/department_mapping/local_department_tasks.csv`
+- AI-fillable form metadata: `minju/form_templates/form_template_catalog.json`
+- Evidence search: `minju/document_issue_guide/*.csv` and `minju/graph/output/final_graph`
+
+GraphRAG/minju expands questions, documents, inquiry tasks, departments, and evidence. The backend still owns validation, question-loop limits, state transitions, and the frontend schema.
+
 허가온 V2에서 GraphRAG는 서류, 부서, 근거, 질문 후보를 확장하는 메인 도메인 레이어입니다. 백엔드는 상태 머신과 질문 루프를 계속 통제하고, GraphRAG는 판단에 필요한 후보 데이터를 반환합니다.
 
 ## 켜는 방법
